@@ -5,29 +5,69 @@ so that the business cost (wasted calls vs missed subscribers) is as low as poss
 
 ## Dataset
 
-- Direct CSV used by the code: https://raw.githubusercontent.com/fabiorcampos/Bank-Marketing/master/data/bank-additional-full.csv
-- Original source (UCI Bank Marketing, Moro, Rita & Cortez, 2014): https://doi.org/10.24432/C5K306
-- 41,188 rows, 20 inputs, target `y` (11.3% "yes"). The separator is `;`.
+- UCI Bank Marketing, `bank-additional-full.csv` (Moro, Rita & Cortez, 2014): https://doi.org/10.24432/C5K306
+- Also on Kaggle, e.g. https://www.kaggle.com/datasets/henriqueyamahata/bank-marketing
+- The code downloads it once from
+  https://raw.githubusercontent.com/fabiorcampos/Bank-Marketing/master/data/bank-additional-full.csv
+  (identical to the UCI file) and keeps a local copy in `data/`.
+- 41,188 calls (May 2008 – Nov 2010), 20 inputs, target `y` (11.3% "yes"). The separator is `;`.
+
+## Layout
+
+```
+src/bank.py                          shared data prep: load, clean, split, cost function
+notebooks/01_models_and_threshold.ipynb   4 models, AUC, calibration, threshold, test result
+notebooks/01_models_and_threshold.py      same analysis as a plain script (python notebooks/01_models_and_threshold.py)
+notebooks/02_shap.ipynb              Tree SHAP on the boosting model (to do)
+models/boosting_for_shap.joblib      fitted boosting pipeline for SHAP
+models/final_model.joblib            selected model + calibration map + threshold
+models/feature_names.csv             feature names after one-hot encoding
+figures/                             ROC, calibration, cost-vs-threshold plots
+results/                             tables behind the slides (CSV)
+starter.py                           first version of the data prep (kept for reference)
+```
 
 ## Getting started
 
 ```
 pip install -r requirements.txt
-python starter.py
+jupyter notebook notebooks/01_models_and_threshold.ipynb
 ```
 
-`starter.py` loads the data, drops `duration` (only known after the call, so it leaks the
-outcome), recodes `pdays`, splits by time into train / validation / test, builds the
-preprocessing step and defines the business cost function.
+`scikit-learn` is pinned because the saved models are pickled with that version.
+
+## Method (notebook 01)
+
+- Data prep: drop `duration` (only known after the call, so it leaks the outcome), replace `pdays`
+  with `contacted_before` (999 = never contacted), keep "unknown" as a category.
+- Split: stratified random 60 / 20 / 20 (train / validation / test). The time-ordered split shows strong
+  drift (see `results/time_split_drift.csv`) and is reported as a limitation.
+- Evaluation loss: average cost per customer, `COST_FP` per wasted call and `COST_FN` per missed
+  subscriber (placeholders 5 and 50 in `src/bank.py`).
+- Models: ridge regression (L2) vs logistic regression (log loss) as glass-box; gradient boosting with
+  squared error vs log loss as black-box. Each tuned separately by 5-fold CV AUC on train.
+- Compare by validation AUC; calibrate with Platt or isotonic (fitted on out-of-fold train
+  predictions); choose the threshold that minimises the cost on validation; report once on test.
+
+## Using the boosting model for SHAP
+
+```python
+import sys, joblib; sys.path.insert(0, "src")
+import bank, shap
+train, val, test = bank.split(bank.clean(bank.load_raw()))   # same split as notebook 01
+X_test, y_test = bank.xy(test)
+pipe = joblib.load("models/boosting_for_shap.joblib")
+X = pipe[:-1].transform(X_test)
+names = pipe[:-1].get_feature_names_out()
+explainer = shap.TreeExplainer(pipe[-1])
+```
 
 ## Open decisions
 
-- Cost numbers: `COST_FP` and `COST_FN` in `starter.py` are placeholders.
-- Split: the time-based split gives subscription rates of 4.8% (train), 11.1% (validation)
-  and 30.8% (test). Decide whether to keep it or use a random stratified split.
+- Cost numbers: `COST_FP` and `COST_FN` in `src/bank.py` are placeholders. Only their ratio changes
+  the decision; `results/cost_sensitivity_validation.csv` shows other ratios.
 
 ## Work split
 
-- Modelling: data prep, cost function, 4 models (glass-box and black-box, each with L2 and
-  another surrogate loss), validation AUC, calibration, threshold.
+- Modelling: data prep, cost function, 4 models, validation AUC, calibration, threshold.
 - Interpretation and slides: Tree SHAP (global and local) on the boosting model, slide deck.

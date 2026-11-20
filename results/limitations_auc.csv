@@ -1,0 +1,5 @@
+,AUC
+"random split, all features (validation)",0.8060476024812491
+"random split, no economic indicators (validation)",0.7819829355158262
+time split: next 20% (validation),0.46518266172871436
+time split: last 20% (test),0.5416774223860839

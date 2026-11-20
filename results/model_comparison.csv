@@ -1,0 +1,5 @@
+model,type,training loss,best hyperparameters,CV AUC (train),train AUC,validation AUC
+Ridge (L2),glass-box,squared error (L2),{'alpha': np.float64(100.0)},0.7812932248155546,0.7874078390563475,0.7993691477192321
+Logistic (log loss),glass-box,log loss,{'C': np.float64(0.1)},0.7836992305590922,0.7894733600456247,0.8010214957073447
+GB (L2),black-box,squared error (L2),"{'learning_rate': 0.05, 'max_depth': 4, 'n_estimators': 300}",0.7909924488747452,0.8242099699591559,0.8043629711307138
+GB (log loss),black-box,log loss,"{'learning_rate': 0.05, 'max_depth': 4, 'n_estimators': 300}",0.791737251223712,0.8227738927189088,0.8060476024812491
