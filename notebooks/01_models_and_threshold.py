@@ -375,6 +375,96 @@ limits = pd.DataFrame({"AUC": [summary.loc[best_name, "validation AUC"], auc_no_
 limits.to_csv(RESULTS / "limitations_auc.csv")
 display(limits)
 
+# ### 9b. Why is the time-split AUC at or below 0.5?
+#
+# It is not a bug: an AUC below 0.5 means the model ranks later customers in the *wrong* order, i.e. it learned
+# patterns that reverse over time. The rows are in date order, so the first 60% (train) are roughly May–Nov 2008,
+# the next 20% roughly Nov 2008 – May 2009 and the last 20% roughly May 2009 – Nov 2010. Three checks:
+#
+# 1. **What each period looks like** – subscription rate, months present, range of the economic indicators,
+#    and how many customers had a previous campaign.
+# 2. **Direction of single features within each period** – AUC of the raw feature
+#    (> 0.5: higher value goes with more "yes").
+# 3. **Which feature groups transfer** – refit on the first 60% with only one group of features, for the selected
+#    boosting model and for the tuned logistic regression.
+
+periods = dict(zip(["train (first 60%)", "next 20%", "last 20%"], bank.time_split(df)))
+profile = pd.DataFrame({
+    n: {"rows": len(d), "subscription rate": d["y"].mean(),
+        "months present": ", ".join(m for m in ["mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+                                    if m in set(d["month"])),
+        "euribor3m range": f"{d['euribor3m'].min():.2f} – {d['euribor3m'].max():.2f}",
+        "emp.var.rate range": f"{d['emp.var.rate'].min():.1f} – {d['emp.var.rate'].max():.1f}",
+        "distinct macro combinations": len(d[bank.MACRO_COLS].drop_duplicates()),
+        "share with previous contact": (d["previous"] > 0).mean(),
+        "share previous outcome = success": (d["poutcome"] == "success").mean()}
+    for n, d in periods.items()})
+profile.to_csv(RESULTS / "time_split_profile.csv")
+display(profile)
+
+single = ["age", "campaign", "previous"] + bank.MACRO_COLS
+direction = pd.DataFrame({n: [roc_auc_score(d["y"], d[c]) for c in single] for n, d in periods.items()}, index=single)
+direction.to_csv(RESULTS / "time_split_feature_direction.csv")
+display(direction)
+
+all_cols = [c for c in X_train.columns]
+no_macro_cols = [c for c in all_cols if c not in bank.MACRO_COLS]
+feature_groups = {
+    "all features": all_cols,
+    "economic indicators only": bank.MACRO_COLS,
+    "month only": ["month"],
+    "without economic indicators": no_macro_cols,
+    "without economic indicators, month, weekday": [c for c in no_macro_cols if c not in ("month", "day_of_week")],
+}
+(p_tr, _, _) = periods.values()
+group_rows = []
+for model_name in [best_name, "Logistic (log loss)"]:
+    for g, cols in feature_groups.items():
+        X_tr = p_tr[cols]
+        pipe = make_pipe(clone(fitted[model_name].named_steps["model"]), X_tr).fit(X_tr, p_tr["y"])
+        for n, d in list(periods.items())[1:]:
+            group_rows.append({"model": model_name, "features": g, "period": n,
+                               "AUC": roc_auc_score(d["y"], scores(pipe, d[cols]))})
+groups_auc = pd.DataFrame(group_rows).pivot_table(index="features", columns=["model", "period"], values="AUC")
+groups_auc = groups_auc.reindex(list(feature_groups))
+groups_auc.to_csv(RESULTS / "time_split_feature_groups_auc.csv")
+display(groups_auc)
+
+fig, axes = plt.subplots(1, 2, figsize=(11, 3.6), sharey=True)
+for ax, period in zip(axes, list(periods)[1:]):
+    sub = groups_auc.xs(period, axis=1, level="period")
+    y_pos = np.arange(len(sub))
+    for k, (m, off) in enumerate([(best_name, -0.18), ("Logistic (log loss)", 0.18)]):
+        ax.barh(y_pos + off, sub[m], height=0.34, color=f"C{k}", label=m)
+    ax.axvline(0.5, color="grey", lw=1, ls="--")
+    ax.set(yticks=y_pos, yticklabels=sub.index, xlim=(0.3, 0.75), xlabel="AUC (trained on first 60% in time)",
+           title=f"Evaluated on {period}")
+    ax.invert_yaxis()
+axes[0].legend(frameon=False, fontsize=8, loc="lower right")
+fig.tight_layout(); fig.savefig(FIG / "time_split_feature_groups.png", bbox_inches="tight")
+plt.show()
+
+# **Reading the three tables.**
+#
+# 1. **The economic indicators act as date stamps, and their effect reverses.** In the training period they take
+#    only a handful of values, and their ranges do not overlap with later periods at all. Within 2008 they only mark
+#    *which week* a call was made; the single-feature AUCs show the direction flipping between periods
+#    (e.g. `euribor3m` and `nr.employed`). A model on the economic indicators alone can score **below 0.5** on later data
+#    (boosting on the next 20%, logistic regression on the last 20%), and trees cannot extrapolate beyond the
+#    training range.
+# 2. **The best months never appear in training.** March, April, September and December are absent from the first 60%
+#    and later have the highest subscription rates.
+# 3. **The strongest real signal did not exist yet.** In 2008 almost nobody had been contacted in a previous
+#    campaign, so the model never saw `poutcome = success`, one of the best predictors later on.
+#
+# What still transfers is the stable customer / contact information: **logistic regression without the economic
+# indicators** keeps a clearly-better-than-random AUC on both later periods, while boosting – which fits the
+# period-specific detail more closely – does worse. So the glass-box model is the more robust one under drift.
+#
+# **Implication.** The random-split AUC (≈ 0.81) is valid for calls made under similar conditions, but overstates
+# performance in a new economic period. In practice: retrain regularly, monitor drift, and treat the economic
+# indicators with care.
+
 # ## 10. Save for Tree SHAP (`02_shap.ipynb`)
 #
 # - `models/boosting_for_shap.joblib` – the best black-box (fitted pipeline: preprocessing + gradient boosting).

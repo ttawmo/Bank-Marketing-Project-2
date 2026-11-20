@@ -41,7 +41,10 @@ jupyter notebook notebooks/01_models_and_threshold.ipynb
 - Data prep: drop `duration` (only known after the call, so it leaks the outcome), replace `pdays`
   with `contacted_before` (999 = never contacted), keep "unknown" as a category.
 - Split: stratified random 60 / 20 / 20 (train / validation / test). The time-ordered split shows strong
-  drift (see `results/time_split_drift.csv`) and is reported as a limitation.
+  drift (see `results/time_split_drift.csv`) and is reported as a limitation. Section 9b of the notebook
+  explains why a model trained on 2008 calls scores AUC ≈ 0.5 on later calls (economic indicators act as
+  date stamps whose effect reverses, the best months are missing from training, previous-campaign history
+  did not exist yet); see `results/time_split_*.csv` and `figures/time_split_feature_groups.png`.
 - Evaluation loss: average cost per customer, `COST_FP` per wasted call and `COST_FN` per missed
   subscriber (placeholders 5 and 50 in `src/bank.py`).
 - Models: ridge regression (L2) vs logistic regression (log loss) as glass-box; gradient boosting with
