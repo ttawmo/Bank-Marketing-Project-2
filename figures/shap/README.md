@@ -187,3 +187,13 @@ Global SHAP identifies macroeconomic indicators and historical campaign informat
 However, the substantial deterioration in time-based validation performance highlights the importance of temporal stability and continuous model monitoring.
 
 Overall, SHAP improves the interpretability of the model and helps translate predictive outputs into actionable business insights, while its explanations should be interpreted as model associations rather than causal relationships.
+
+## 8. Supplementary Visualisations
+
+### Encoded Feature Importance
+
+![Encoded Global SHAP Importance](global_tree_shap_bar.png)
+
+### Encoded Local Feature Contributions
+
+![Encoded Local SHAP Waterfall](local_tree_shap_waterfall.png)
