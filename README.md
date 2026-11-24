@@ -64,12 +64,29 @@ X = pipe[:-1].transform(X_test)
 names = pipe[:-1].get_feature_names_out()
 explainer = shap.TreeExplainer(pipe[-1])
 ```
-## SHAP Analysis 
+## SHAP Analysis: Global and Local Tree SHAP
+Overview
+This section presents the interpretability analysis of the selected Gradient Boosting model trained with Logistic Loss.
+
+The objective is to understand how different customer characteristics, previous campaign information, and macroeconomic indicators influence the model's predictions of term deposit subscription.
+
+We apply Tree SHAP to provide two levels of model interpretability:
+
+Global SHAP: Identifies the most influential features across the validation dataset.
+Local SHAP: Explains how individual features contribute to the prediction for a specific customer.
+The analysis helps translate model predictions into interpretable business insights for bank marketing campaigns.
 
 ## Open decisions
 
 - Cost numbers: `COST_FP` and `COST_FN` in `src/bank.py` are placeholders. Only their ratio changes
   the decision; `results/cost_sensitivity_validation.csv` shows other ratios.
+  
+The Global and Local Tree SHAP analyses provide complementary perspectives on the selected Gradient Boosting model.
+Global SHAP identifies macroeconomic indicators and historical campaign information as important predictors, while Local SHAP demonstrates how these features contribute to an individual customer's prediction.
+
+However, the substantial deterioration in time-based validation performance highlights the importance of temporal stability and continuous model monitoring.
+
+Overall, SHAP improves the interpretability of the model and helps translate predictive outputs into actionable business insights, while its explanations should be interpreted as model associations rather than causal relationships.
 
 ## Work split
 
