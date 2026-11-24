@@ -64,6 +64,7 @@ X = pipe[:-1].transform(X_test)
 names = pipe[:-1].get_feature_names_out()
 explainer = shap.TreeExplainer(pipe[-1])
 ```
+## SHAP Analysis 
 
 ## Open decisions
 
