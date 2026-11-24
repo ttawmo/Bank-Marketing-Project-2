@@ -1,0 +1,2 @@
+validation_original_row_index,age,job,marital,education,default,housing,loan,contact,month,day_of_week,campaign,previous,poutcome,emp.var.rate,cons.price.idx,cons.conf.idx,euribor3m,nr.employed,contacted_before,actual_y,predicted_probability,validation_threshold,predicted_class
+39498,80,retired,divorced,basic.4y,no,yes,yes,cellular,apr,thu,1,2,success,-1.8,93.749,-34.6,0.644,5008.7,1,1,0.9516066697718414,0.0825,1
