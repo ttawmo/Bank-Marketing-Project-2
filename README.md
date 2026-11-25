@@ -18,11 +18,13 @@ so that the business cost (wasted calls vs missed subscribers) is as low as poss
 src/bank.py                          shared data prep: load, clean, split, cost function
 notebooks/01_models_and_threshold.ipynb   4 models, AUC, calibration, threshold, test result
 notebooks/01_models_and_threshold.py      same analysis as a plain script (python notebooks/01_models_and_threshold.py)
-notebooks/02_shap.ipynb              Tree SHAP on the boosting model (to do)
+notebooks/02_shap_analysis.py        Tree SHAP on the boosting model (global + local)
 models/boosting_for_shap.joblib      fitted boosting pipeline for SHAP
 models/final_model.joblib            selected model + calibration map + threshold
 models/feature_names.csv             feature names after one-hot encoding
 figures/                             ROC, calibration, cost-vs-threshold plots
+figures/shap/                        SHAP plots (see SHAP_INTERPRETABILITY.md)
+SHAP_INTERPRETABILITY.md             SHAP method, results and limitations
 results/                             tables behind the slides (CSV)
 starter.py                           first version of the data prep (kept for reference)
 ```
@@ -64,29 +66,23 @@ X = pipe[:-1].transform(X_test)
 names = pipe[:-1].get_feature_names_out()
 explainer = shap.TreeExplainer(pipe[-1])
 ```
-## SHAP Analysis: Global and Local Tree SHAP
-Overview
-This section presents the interpretability analysis of the selected Gradient Boosting model trained with Logistic Loss.
+## SHAP analysis (script 02)
 
-The objective is to understand how different customer characteristics, previous campaign information, and macroeconomic indicators influence the model's predictions of term deposit subscription.
+`python notebooks/02_shap_analysis.py` runs Tree SHAP on the selected boosting model (global and local)
+and saves the plots to `figures/shap/` and the tables to `results/`. Full write-up: `SHAP_INTERPRETABILITY.md`.
 
-We apply Tree SHAP to provide two levels of model interpretability:
-
-Global SHAP: Identifies the most influential features across the validation dataset.
-Local SHAP: Explains how individual features contribute to the prediction for a specific customer.
-The analysis helps translate model predictions into interpretable business insights for bank marketing campaigns.
+- SHAP explains the raw boosting score (1,000-row training background); decisions use the calibrated
+  probability and the 0.0825 threshold from `models/final_model.joblib`.
+- Global: the economic indicators (`nr.employed`, `euribor3m`, `cons.conf.idx`) rank highest. `nr.employed`
+  has only 11 values, so it mainly marks the time period, which is a drift risk rather than a business lever.
+  The strongest customer-level predictors are contact history (`contacted_before`, `poutcome`) and the contact channel.
+- Local: the highest-scoring true positive and a borderline call just above the threshold.
+- SHAP shows associations in the fitted model, not causal effects.
 
 ## Open decisions
 
 - Cost numbers: `COST_FP` and `COST_FN` in `src/bank.py` are placeholders. Only their ratio changes
   the decision; `results/cost_sensitivity_validation.csv` shows other ratios.
-  
-The Global and Local Tree SHAP analyses provide complementary perspectives on the selected Gradient Boosting model.
-Global SHAP identifies macroeconomic indicators and historical campaign information as important predictors, while Local SHAP demonstrates how these features contribute to an individual customer's prediction.
-
-However, the substantial deterioration in time-based validation performance highlights the importance of temporal stability and continuous model monitoring.
-
-Overall, SHAP improves the interpretability of the model and helps translate predictive outputs into actionable business insights, while its explanations should be interpreted as model associations rather than causal relationships.
 
 ## Work split
 
